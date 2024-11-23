@@ -41,10 +41,10 @@ func newGRPCTestServer(logger ctxd.Logger) *gRPCTestServer {
 	}
 }
 
-func (srv *gRPCTestServer) SayHello(ctx context.Context, in *testdata.HelloRequest) (*testdata.HelloReply, error) {
-	srv.logger.Debug(ctx, fmt.Sprintf("Received: %v", in.GetName()))
+func (srv *gRPCTestServer) SayHello(ctx context.Context, req *testdata.HelloRequest) (*testdata.HelloReply, error) {
+	srv.logger.Debug(ctx, fmt.Sprintf("Received: %v", req.GetName()))
 
-	return &testdata.HelloReply{Message: "Hello " + in.GetName()}, nil
+	return &testdata.HelloReply{Message: "Hello " + req.GetName()}, nil
 }
 
 // RegisterService registers the service implementation to grpc service.
@@ -67,7 +67,7 @@ func startGRPCService(logger ctxd.Logger, shutdownDoneCh, shutdownCh chan struct
 	)
 
 	srv := servers.NewGRPC(
-		&servers.Config{
+		servers.Config{
 			Name: "Test service",
 		},
 		ops...,

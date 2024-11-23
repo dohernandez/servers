@@ -24,7 +24,7 @@ func NewPProf(cfg Config) *REST {
 	r.Method(http.MethodGet, "/version", NewRestVersionHandler())
 
 	return NewREST(
-		&Config{
+		Config{
 			Name: cfg.Name,
 			Host: cfg.Host,
 			Port: cfg.Port,

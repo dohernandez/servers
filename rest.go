@@ -19,7 +19,7 @@ type REST struct {
 }
 
 // NewREST constructs a new rest Server.
-func NewREST(config *Config, handler http.Handler, opts ...Option) *REST {
+func NewREST(config Config, handler http.Handler, opts ...Option) *REST {
 	srv := REST{}
 
 	srv.Server = NewServer(config, opts...)

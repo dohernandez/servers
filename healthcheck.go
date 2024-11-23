@@ -18,7 +18,7 @@ func NewHealthCheck(cfg Config, h http.Handler) *REST {
 	r.Method(http.MethodGet, "/version", NewRestVersionHandler())
 
 	return NewREST(
-		&Config{
+		Config{
 			Name: cfg.Name,
 			Host: cfg.Host,
 			Port: cfg.Port,

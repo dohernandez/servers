@@ -13,7 +13,7 @@ import (
 
 func startRESTService(mux *http.ServeMux, host string, port uint, shutdownDoneCh, shutdownCh chan struct{}) (*servers.REST, string, error) {
 	srv := servers.NewREST(
-		&servers.Config{
+		servers.Config{
 			Name: "Test service",
 			Host: host,
 			Port: port,

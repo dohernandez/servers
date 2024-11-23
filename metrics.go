@@ -46,7 +46,7 @@ func WithCollector(collectors ...prometheus.Collector) Option {
 }
 
 // NewMetrics initiates a new wrapped prom server collector.
-func NewMetrics(config *Config, opts ...Option) *Metrics {
+func NewMetrics(config Config, opts ...Option) *Metrics {
 	srv := &Metrics{
 		registered: make(map[string]bool),
 	}

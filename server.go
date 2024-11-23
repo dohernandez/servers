@@ -27,16 +27,32 @@ func WithAddrAssigned() Option {
 	}
 }
 
+// WithListener sets the listener. Server does not need to start a new one.
+func WithListener(l net.Listener, shouldCloseListener bool) Option {
+	return func(srv any) {
+		s, ok := srv.(*Server)
+		if !ok {
+			// skip does not apply to this instance.
+			return
+		}
+
+		s.listener = l
+		s.config.shouldCloseListener = shouldCloseListener
+	}
+}
+
 // Config contains configuration options for a Server.
 type Config struct {
 	Name string `envconfig:"NAME" required:"true"`
 	Host string `envconfig:"HOST"`
 	Port uint   `envconfig:"PORT" required:"true"`
+
+	shouldCloseListener bool
 }
 
 // Server is a listening server instance.
 type Server struct {
-	config *Config
+	config Config
 
 	AddrAssigned chan string
 
@@ -52,10 +68,12 @@ type Server struct {
 }
 
 // NewServer constructs a new Server.
-func NewServer(config *Config, opts ...Option) *Server {
+func NewServer(config Config, opts ...Option) *Server {
 	srv := Server{
 		config: config,
 	}
+
+	srv.config.shouldCloseListener = true
 
 	for _, o := range opts {
 		o(&srv)
@@ -107,12 +125,16 @@ func (srv *Server) Start() error {
 		return nil
 	}
 
-	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", srv.config.Host, srv.config.Port))
-	if err != nil {
-		return fmt.Errorf("%w: %v", ErrListenerFailedStart, err) //nolint:errorlint
-	}
+	srv.started = true
 
-	srv.listener = lis
+	if srv.listener == nil {
+		lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", srv.config.Host, srv.config.Port))
+		if err != nil {
+			return fmt.Errorf("%w: %v", ErrListenerFailedStart, err) //nolint:errorlint
+		}
+
+		srv.listener = lis
+	}
 
 	// the server is being asked for the dynamical address assigned.
 	if srv.AddrAssigned != nil {
@@ -130,7 +152,7 @@ func (srv *Server) Stop() {
 	srv.stopped = true
 	srv.sm.Unlock()
 
-	if srv.listener != nil {
+	if srv.listener != nil && srv.config.shouldCloseListener {
 		srv.listener.Close() //nolint:errcheck,gosec
 	}
 }
