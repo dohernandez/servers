@@ -183,3 +183,33 @@ func TestGRPCRest_StartServing_WithChainUnaryInterceptor_Logger(t *testing.T) {
 	assert.Equal(t, "info", out["level"], "wrong log level third message: got %s want info", out["level"])
 	assert.Equal(t, "finished call", out["message"], "wrong log message third message: got %s want grpc: called server", out["message"])
 }
+
+func TestGRPCRest_StartServing_WithHandlers(t *testing.T) {
+	grpcSrv, grpcAddr, err := startGRPCService(nil, nil, nil)
+	require.NoErrorf(t, err, "start GRPC: %v", err)
+
+	defer grpcSrv.Stop()
+
+	srv, addr, err := startGRPCRestService(grpcAddr, nil, nil, servers.WithHandlers(
+		map[string]http.Handler{
+			"/": servers.NewRestRootHandler("Test service"),
+		},
+	))
+	require.NoErrorf(t, err, "start GRPC Rest: %v", err)
+
+	defer srv.Stop()
+
+	res, err := http.Get(fmt.Sprintf("http://%s/", addr))
+	if err != nil {
+		t.Errorf("failed to call REST server: %s", err)
+	}
+
+	defer res.Body.Close() //nolint:errcheck
+
+	data, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Errorf("failed to read response body: %s", err)
+	}
+
+	require.Equal(t, "Welcome to Test service", string(data))
+}
