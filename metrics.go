@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"reflect"
 
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -45,6 +46,19 @@ func WithCollector(collectors ...prometheus.Collector) Option {
 	}
 }
 
+// WithGRPCServer sets the GRPC server.
+func WithGRPCServer(grpcSrv *GRPC) Option {
+	return func(srv any) {
+		s, ok := srv.(*Metrics)
+		if !ok {
+			// skip does not apply to this instance.
+			return
+		}
+
+		s.grpcServer = grpcSrv
+	}
+}
+
 // NewMetrics initiates a new wrapped prom server collector.
 func NewMetrics(config Config, opts ...Option) *Metrics {
 	srv := &Metrics{
@@ -65,6 +79,8 @@ func NewMetrics(config Config, opts ...Option) *Metrics {
 // Metrics is a listening HTTP collector server instance.
 type Metrics struct {
 	*Server
+
+	grpcServer *GRPC
 
 	httpServer *http.Server
 
@@ -88,6 +104,15 @@ func (srv *Metrics) Start() error {
 			EnableOpenMetrics: true,
 		},
 	)
+
+	if srv.grpcServer != nil {
+		// Register gRPC metrics with the custom registry.
+		grpcMetrics := grpc_prometheus.DefaultServerMetrics
+		reg.MustRegister(grpcMetrics)
+
+		// Initialize gRPC server metrics.
+		grpcMetrics.InitializeMetrics(srv.grpcServer.grpcServer)
+	}
 
 	if err := srv.Server.Start(); err != nil {
 		return err
