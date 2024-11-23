@@ -38,6 +38,7 @@ func WithListener(l net.Listener, shouldCloseListener bool) Option {
 
 		s.listener = l
 		s.config.shouldCloseListener = shouldCloseListener
+		s.addr = l.Addr().String()
 	}
 }
 
@@ -57,6 +58,7 @@ type Server struct {
 	AddrAssigned chan string
 
 	listener net.Listener
+	addr     string
 
 	shutdownSignal <-chan struct{}
 	shutdownDone   chan<- struct{}
@@ -99,7 +101,7 @@ func (srv *Server) Name() string {
 
 // Addr service address.
 func (srv *Server) Addr() string {
-	return fmt.Sprintf("%s:%d", srv.config.Host, srv.config.Port)
+	return srv.addr
 }
 
 // handleShutdown will wait and handle shutdown signal that comes to the server
@@ -134,11 +136,12 @@ func (srv *Server) Start() error {
 		}
 
 		srv.listener = lis
+		srv.addr = lis.Addr().String()
 	}
 
 	// the server is being asked for the dynamical address assigned.
 	if srv.AddrAssigned != nil {
-		srv.AddrAssigned <- srv.listener.Addr().String()
+		srv.AddrAssigned <- srv.addr
 	}
 
 	go srv.handleShutdown()
