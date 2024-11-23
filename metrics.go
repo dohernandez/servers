@@ -59,10 +59,24 @@ func WithGRPCServer(grpcSrv *GRPC) Option {
 	}
 }
 
+// WithExposeAt sets the path to expose the metrics.
+func WithExposeAt(path string) Option {
+	return func(srv any) {
+		s, ok := srv.(*Metrics)
+		if !ok {
+			// skip does not apply to this instance.
+			return
+		}
+
+		s.exposeAt = path
+	}
+}
+
 // NewMetrics initiates a new wrapped prom server collector.
 func NewMetrics(config Config, opts ...Option) *Metrics {
 	srv := &Metrics{
 		registered: make(map[string]bool),
+		exposeAt:   "/metrics",
 	}
 
 	srv.Server = NewServer(config, opts...)
@@ -83,6 +97,7 @@ type Metrics struct {
 	grpcServer *GRPC
 
 	httpServer *http.Server
+	exposeAt   string
 
 	registered map[string]bool
 	collectors []prometheus.Collector
@@ -98,12 +113,16 @@ func (srv *Metrics) Start() error {
 	reg.MustRegister(collectors.NewBuildInfoCollector())
 	reg.MustRegister(collectors.NewGoCollector())
 
-	srv.httpServer.Handler = promhttp.HandlerFor(
+	// Create a new ServeMux for routing.
+	mux := http.NewServeMux()
+
+	// Register the /metrics endpoint handler.
+	mux.Handle(srv.exposeAt, promhttp.HandlerFor(
 		reg,
 		promhttp.HandlerOpts{
-			EnableOpenMetrics: true,
+			EnableOpenMetrics: true, // Enable OpenMetrics format.
 		},
-	)
+	))
 
 	if srv.grpcServer != nil {
 		// Register gRPC metrics with the custom registry.
@@ -117,6 +136,9 @@ func (srv *Metrics) Start() error {
 	if err := srv.Server.Start(); err != nil {
 		return err
 	}
+
+	// Use the custom mux with the /metrics handler.
+	srv.httpServer.Handler = mux
 
 	if err := srv.serve(srv.httpServer, srv.listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("%w: %w addr %s", err, ErrMetricsStart, srv.listener.Addr().String())
