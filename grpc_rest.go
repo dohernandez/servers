@@ -1,6 +1,8 @@
 package servers
 
 import (
+	"net/http"
+
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 )
 
@@ -25,7 +27,7 @@ func WithServerMuxOption(opts ...runtime.ServeMuxOption) Option {
 
 // WithHandlers sets the options for custom path handlers to the mux server.
 // Apply to GRPCRest server instances.
-func WithHandlers(handlers ...func(mux *runtime.ServeMux) error) Option {
+func WithHandlers(handlers map[string]http.Handler) Option {
 	return func(srv any) {
 		s, ok := srv.(*GRPCRest)
 		if !ok {
@@ -33,7 +35,18 @@ func WithHandlers(handlers ...func(mux *runtime.ServeMux) error) Option {
 			return
 		}
 
-		s.options.register = append(s.options.register, handlers...)
+		for p, handler := range handlers {
+			s.options.register = append(s.options.register, func(mux *runtime.ServeMux) error {
+				err := mux.HandlePath(http.MethodGet, p, func(w http.ResponseWriter, r *http.Request, _ map[string]string) {
+					handler.ServeHTTP(w, r)
+				})
+				if err != nil {
+					return err
+				}
+
+				return nil
+			})
+		}
 	}
 }
 
