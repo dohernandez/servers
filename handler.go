@@ -34,9 +34,9 @@ func NewRestVersionHandler() http.Handler {
 
 // NewRestAPIDocsHandlers creates a handler for an endpoint to response on /docs path to show the api documentation.
 // It returns a map of handlers for the pattern and the handler.
-func NewRestAPIDocsHandlers(serviceName, swaggerPath string, swaggerJSON []byte) map[string]http.Handler {
+func NewRestAPIDocsHandlers(serviceName, basePath, swaggerPath string, swaggerJSON []byte) map[string]http.Handler {
 	// handler root path
-	swh := v3.NewHandler(serviceName, swaggerPath, "/docs/")
+	swh := v3.NewHandler(serviceName, swaggerPath, basePath)
 
 	return map[string]http.Handler{
 		"/docs/service.swagger.json": http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
