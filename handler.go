@@ -2,9 +2,9 @@ package servers
 
 import (
 	"encoding/json"
-	"github.com/bool64/ctxd"
 	"net/http"
 
+	"github.com/bool64/ctxd"
 	v3 "github.com/swaggest/swgui/v3"
 )
 
