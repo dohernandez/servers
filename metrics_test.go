@@ -14,7 +14,7 @@ import (
 
 func startMetricsService(host string, port uint, shutdownDoneCh, shutdownCh chan struct{}, collectors ...prometheus.Collector) (*servers.Metrics, string, error) {
 	srv := servers.NewMetrics(
-		&servers.Config{
+		servers.Config{
 			Name: "Test service",
 			Host: host,
 			Port: port,

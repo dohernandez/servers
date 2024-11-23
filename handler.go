@@ -3,6 +3,8 @@ package servers
 import (
 	"encoding/json"
 	"net/http"
+
+	v3 "github.com/swaggest/swgui/v3"
 )
 
 // NewRestRootHandler creates a handler for an endpoint to response on / path.
@@ -27,4 +29,26 @@ func NewRestVersionHandler() http.Handler {
 			http.Error(rw, err.Error(), http.StatusInternalServerError)
 		}
 	})
+}
+
+// NewRestAPIDocsHandlers creates a handler for an endpoint to response on /docs path to show the api documentation.
+// It returns a map of handlers for the pattern and the handler.
+func NewRestAPIDocsHandlers(serviceName, swaggerPath string) map[string]http.Handler {
+	// handler root path
+	swh := v3.NewHandler(serviceName, swaggerPath, "/docs/")
+
+	return map[string]http.Handler{
+		"/docs": http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			swh.ServeHTTP(w, r)
+		}),
+		"/docs/swagger-ui-bundle.js": http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			swh.ServeHTTP(w, r)
+		}),
+		"/docs/swagger-ui-standalone-preset.js": http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			swh.ServeHTTP(w, r)
+		}),
+		"/docs/swagger-ui.css": http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			swh.ServeHTTP(w, r)
+		}),
+	}
 }

@@ -169,7 +169,7 @@ func grpcInterceptorLogger(l ctxd.Logger) grpcLogging.Logger {
 }
 
 // NewGRPC initiates a new wrapped grpc server.
-func NewGRPC(config *Config, opts ...Option) *GRPC {
+func NewGRPC(config Config, opts ...Option) *GRPC {
 	srv := &GRPC{}
 
 	srv.Server = NewServer(config, opts...)
@@ -241,7 +241,7 @@ func (srv *GRPC) Start() error {
 	return nil
 }
 
-// Stop gracefully shuts down the REST server.
+// Stop gracefully shuts down the GRPC server.
 func (srv *GRPC) Stop() {
 	srv.grpcServer.GracefulStop()
 

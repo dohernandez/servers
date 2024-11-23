@@ -17,6 +17,10 @@ ifneq "$(wildcard ./vendor )" ""
   ifneq "$(wildcard ./vendor/github.com/bool64/dev)" ""
   	DEVGO_PATH := ./vendor/github.com/bool64/dev
   endif
+  # adding github.com/dohernandez/dev-grpc
+  ifneq "$(wildcard ./vendor/github.com/dohernandez/dev-grpc)" ""
+  	DEVGRPCGO_PATH := ./vendor/github.com/dohernandez/dev-grpc
+  endif
 endif
 
 ifeq ($(DEVGO_PATH),)
@@ -26,6 +30,21 @@ ifeq ($(DEVGO_PATH),)
     	DEVGO_PATH := $(shell export GO111MODULE=on && $(GO) get github.com/bool64/dev && $(GO) list -f '{{.Dir}}' -m github.com/bool64/dev)
 	endif
 endif
+
+# defining DEVGRPCGO_PATH
+ifeq ($(DEVGRPCGO_PATH),)
+	DEVGRPCGO_PATH := $(shell GO111MODULE=on $(GO) list ${modVendor} -f '{{.Dir}}' -m github.com/bool64/dev)
+	ifeq ($(DEVGRPCGO_PATH),)
+    	$(info Module github.com/dohernandez/dev-grpc not found, downloading.)
+    	DEVGRPCGO_PATH := $(shell export GO111MODULE=on && $(GO) get github.com/dohernandez/dev-grpc && $(GO) list -f '{{.Dir}}' -m github.com/dohernandez/dev-grpc)
+	endif
+endif
+
+SRC_PROTO_PATH = ./testdata/proto
+GO_PROTO_PATH = ./testdata
+SWAGGER_PATH = ./testdata
+
+-include $(DEVGRPCGO_PATH)/makefiles/protoc.mk
 
 -include $(DEVGO_PATH)/makefiles/main.mk
 -include $(DEVGO_PATH)/makefiles/lint.mk
@@ -38,3 +57,8 @@ test: test-unit
 
 ## Check the commit compile and test the change.
 check: lint test
+
+## Generate code from proto file(s)
+proto-gen: proto-gen-code-swagger
+
+.PHONY: test check proto-gen
