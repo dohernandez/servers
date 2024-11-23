@@ -43,7 +43,9 @@ func NewRestAPIDocsHandlers(serviceName, basePath, swaggerPath string, swaggerJS
 			w.Header().Set("Content-Type", "application/json")
 
 			_, err := w.Write(swaggerJSON)
-			panic(ctxd.WrapError(r.Context(), err, "failed to load /docs/service.swagger.json file"))
+			if err != nil {
+				panic(ctxd.WrapError(r.Context(), err, "failed to load /docs/service.swagger.json file"))
+			}
 		}),
 		"/docs": http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			swh.ServeHTTP(w, r)
