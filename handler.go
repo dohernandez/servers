@@ -2,6 +2,7 @@ package servers
 
 import (
 	"encoding/json"
+	"github.com/bool64/ctxd"
 	"net/http"
 
 	v3 "github.com/swaggest/swgui/v3"
@@ -33,11 +34,17 @@ func NewRestVersionHandler() http.Handler {
 
 // NewRestAPIDocsHandlers creates a handler for an endpoint to response on /docs path to show the api documentation.
 // It returns a map of handlers for the pattern and the handler.
-func NewRestAPIDocsHandlers(serviceName, swaggerPath string) map[string]http.Handler {
+func NewRestAPIDocsHandlers(serviceName, swaggerPath string, swaggerJSON []byte) map[string]http.Handler {
 	// handler root path
 	swh := v3.NewHandler(serviceName, swaggerPath, "/docs/")
 
 	return map[string]http.Handler{
+		"/docs/service.swagger.json": http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+
+			_, err := w.Write(swaggerJSON)
+			panic(ctxd.WrapError(r.Context(), err, "failed to load /docs/service.swagger.json file"))
+		}),
 		"/docs": http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			swh.ServeHTTP(w, r)
 		}),
