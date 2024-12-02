@@ -9,11 +9,23 @@ import (
 )
 
 // NewRestRootHandler creates a handler for an endpoint to response on / path.
-func NewRestRootHandler(serviceName string) http.Handler {
+func NewRestRootHandler(serviceName string, links ...any) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 		rw.Header().Set("Content-Type", "text/html")
 
-		_, err := rw.Write([]byte("Welcome to " + serviceName))
+		body := "Welcome to " + serviceName
+
+		if links != nil {
+			// Add links to the body
+			body += "<br><br>Links:<br>"
+
+			// paar text and link
+			for i := 0; i < len(links); i += 2 {
+				body += "<a href=\"" + links[i+1].(string) + "\">" + links[i].(string) + "</a><br>"
+			}
+		}
+
+		_, err := rw.Write([]byte(body))
 		if err != nil {
 			http.Error(rw, err.Error(), http.StatusInternalServerError)
 		}

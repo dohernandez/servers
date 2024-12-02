@@ -7,6 +7,8 @@ import (
 )
 
 type grpcRestOptions struct {
+	endpointDocsSettle bool
+
 	muxOpts  []runtime.ServeMuxOption
 	register []func(mux *runtime.ServeMux) error
 }
@@ -22,6 +24,25 @@ func WithServerMuxOption(opts ...runtime.ServeMuxOption) Option {
 		}
 
 		s.options.muxOpts = append(s.options.muxOpts, opts...)
+	}
+}
+
+func WithDocEndpoint(serviceName, basePath, filepath string, JSON []byte) Option {
+	return func(srv any) {
+		s, ok := srv.(*GRPCRest)
+		if !ok {
+			// skip does not apply to this instance.
+			return
+		}
+
+		s.options.endpointDocsSettle = true
+
+		WithHandlers(NewRestAPIDocsHandlers(
+			serviceName,
+			basePath,
+			filepath,
+			JSON,
+		))
 	}
 }
 
@@ -83,6 +104,19 @@ func NewGRPCRest(config Config, opts ...Option) (*GRPCRest, error) {
 	for _, o := range opts {
 		o(srv)
 	}
+
+	var links []any
+
+	if srv.options.endpointDocsSettle {
+		links = append(links, "API Docs", "/docs")
+	}
+
+	links = append(links, "Version", "/version")
+
+	WithHandlers(map[string]http.Handler{
+		"/":        NewRestRootHandler(config.Name, links...),
+		"/version": NewRestVersionHandler(),
+	})(srv)
 
 	// Init REST Server.
 	mux := runtime.NewServeMux(srv.options.muxOpts...)
