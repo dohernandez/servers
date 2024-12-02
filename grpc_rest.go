@@ -7,6 +7,9 @@ import (
 )
 
 type grpcRestOptions struct {
+	withDocEndpoint     bool
+	withVersionEndpoint bool
+
 	muxOpts  []runtime.ServeMuxOption
 	register []func(mux *runtime.ServeMux) error
 }
@@ -22,6 +25,43 @@ func WithServerMuxOption(opts ...runtime.ServeMuxOption) Option {
 		}
 
 		s.options.muxOpts = append(s.options.muxOpts, opts...)
+	}
+}
+
+// WithDocEndpoint sets the options for the mux server to serve API docs.
+func WithDocEndpoint(serviceName, basePath, filepath string, json []byte) Option {
+	return func(srv any) {
+		s, ok := srv.(*GRPCRest)
+		if !ok {
+			// skip does not apply to this instance.
+			return
+		}
+
+		s.options.withDocEndpoint = true
+
+		WithHandlers(NewRestAPIDocsHandlers(
+			serviceName,
+			basePath,
+			filepath,
+			json,
+		))
+	}
+}
+
+// WithVersionEndpoint sets the options for the mux server to serve version.
+func WithVersionEndpoint() Option {
+	return func(srv any) {
+		s, ok := srv.(*GRPCRest)
+		if !ok {
+			// skip does not apply to this instance.
+			return
+		}
+
+		s.options.withVersionEndpoint = true
+
+		WithHandlers(map[string]http.Handler{
+			"/version": NewRestVersionHandler(),
+		})
 	}
 }
 
@@ -83,6 +123,21 @@ func NewGRPCRest(config Config, opts ...Option) (*GRPCRest, error) {
 	for _, o := range opts {
 		o(srv)
 	}
+
+	var links []any
+
+	if srv.options.withDocEndpoint {
+		links = append(links, "API Docs", "/docs")
+	}
+
+	if srv.options.withVersionEndpoint {
+		links = append(links, "Version", "/version")
+	}
+
+	WithHandlers(map[string]http.Handler{
+		"/":        NewRestRootHandler(config.Name, links...),
+		"/version": NewRestVersionHandler(),
+	})(srv)
 
 	// Init REST Server.
 	mux := runtime.NewServeMux(srv.options.muxOpts...)
