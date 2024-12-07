@@ -44,7 +44,7 @@ func WithDocEndpoint(serviceName, basePath, filepath string, json []byte) Option
 			basePath,
 			filepath,
 			json,
-		))
+		))(srv)
 	}
 }
 
@@ -61,7 +61,7 @@ func WithVersionEndpoint() Option {
 
 		WithHandlers(map[string]http.Handler{
 			"/version": NewRestVersionHandler(),
-		})
+		})(srv)
 	}
 }
 
@@ -135,8 +135,7 @@ func NewGRPCRest(config Config, opts ...Option) (*GRPCRest, error) {
 	}
 
 	WithHandlers(map[string]http.Handler{
-		"/":        NewRestRootHandler(config.Name, links...),
-		"/version": NewRestVersionHandler(),
+		"/": NewRestRootHandler(config.Name, links...),
 	})(srv)
 
 	// Init REST Server.
