@@ -3,13 +3,15 @@ package servers
 import (
 	"context"
 	"encoding/json"
-	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	"google.golang.org/protobuf/proto"
 	"net/http"
 	"strconv"
 
 	"github.com/bool64/ctxd"
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	v3 "github.com/swaggest/swgui/v3"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 // NewRestRootHandler creates a handler for an endpoint to response on / path.
@@ -78,9 +80,9 @@ func NewRestAPIDocsHandlers(serviceName, basePath, swaggerPath string, swaggerJS
 	}
 }
 
-// NewXhttpCodeResponseModifier is used to modify the Response status code using x-http-code header
+// xhttpCodeResponseModifier is used to modify the Response status code using x-http-code header
 // by setting a different code than 200 on success or 500 on failure.
-func NewXhttpCodeResponseModifier() func(ctx context.Context, w http.ResponseWriter, _ proto.Message) error {
+func xhttpCodeResponseModifier() func(ctx context.Context, w http.ResponseWriter, _ proto.Message) error {
 	return func(ctx context.Context, w http.ResponseWriter, _ proto.Message) error {
 		md, ok := runtime.ServerMetadataFromContext(ctx)
 		if !ok {
@@ -105,11 +107,77 @@ func NewXhttpCodeResponseModifier() func(ctx context.Context, w http.ResponseWri
 	}
 }
 
-// CleanGrpcMetadataResponseModifier is used to clean the grpc metadata from the response.
-func CleanGrpcMetadataResponseModifier() func(ctx context.Context, w http.ResponseWriter, _ proto.Message) error {
+// cleanGrpcMetadataResponseModifier is used to clean the grpc metadata from the response.
+func cleanGrpcMetadataResponseModifier() func(ctx context.Context, w http.ResponseWriter, _ proto.Message) error {
 	return func(ctx context.Context, w http.ResponseWriter, _ proto.Message) error {
 		w.Header().Del("Grpc-Metadata-Content-Type")
 
 		return nil
+	}
+}
+
+type errorResponse struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+type badRequestResponse struct {
+	errorResponse
+
+	Details []badRequestResponseErrorDetail `json:"details,omitempty"`
+}
+
+type badRequestResponseErrorDetail struct {
+	Field       string `json:"field"`
+	Description string `json:"description"`
+}
+
+func customErrorHandler() func(context.Context, *runtime.ServeMux, runtime.Marshaler, http.ResponseWriter, *http.Request, error) {
+	return func(_ context.Context, _ *runtime.ServeMux, marshaler runtime.Marshaler, w http.ResponseWriter, _ *http.Request, err error) {
+		// Extract gRPC status error
+		st, ok := status.FromError(err)
+		if !ok {
+			// Fallback for non-gRPC errors
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Default HTTP status code
+		httpStatus := runtime.HTTPStatusFromCode(st.Code())
+
+		if httpStatus != http.StatusBadRequest {
+			// Write the custom error response
+			w.WriteHeader(httpStatus)
+			_ = json.NewEncoder(w).Encode(errorResponse{
+				Code:    httpStatus,
+				Message: st.Message(),
+			}) //nolint:errcheck
+
+			return
+		}
+
+		// Transform google.rpc.BadRequest into a simplified structure
+		var details []badRequestResponseErrorDetail
+
+		for _, d := range st.Details() {
+			if badRequest, ok := d.(*errdetails.BadRequest); ok {
+				for _, violation := range badRequest.FieldViolations {
+					details = append(details, badRequestResponseErrorDetail{
+						Field:       violation.Field,
+						Description: violation.Description,
+					})
+				}
+			}
+		}
+
+		// Write the custom error response
+		w.WriteHeader(httpStatus)
+		_ = json.NewEncoder(w).Encode(badRequestResponse{
+			errorResponse: errorResponse{
+				Code:    httpStatus,
+				Message: st.Message(),
+			},
+			Details: details,
+		}) //nolint:errcheck
 	}
 }
