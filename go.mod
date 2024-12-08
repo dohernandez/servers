@@ -9,6 +9,7 @@ require (
 	github.com/bool64/zapctxd v1.2.0
 	github.com/dohernandez/dev-grpc v0.4.0
 	github.com/go-chi/chi/v5 v5.1.0
+	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.24.0

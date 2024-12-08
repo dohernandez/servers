@@ -3,6 +3,7 @@ package servers
 import (
 	"context"
 	"encoding/json"
+	"google.golang.org/grpc/codes"
 	"net/http"
 	"strconv"
 
@@ -117,66 +118,80 @@ func cleanGrpcMetadataResponseModifier() func(ctx context.Context, w http.Respon
 }
 
 type errorResponse struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
+	Code    int                    `json:"code"`
+	Message string                 `json:"message,omitempty"`
+	Error   string                 `json:"error,omitempty"`
+	Details []errorResponseDetails `json:"details,omitempty"`
 }
 
-type badRequestResponse struct {
-	errorResponse
-
-	Details []badRequestResponseErrorDetail `json:"details,omitempty"`
+type errorResponseDetails struct {
+	Field       string `json:"field,omitempty"`
+	Description string `json:"description,omitempty"`
 }
 
-type badRequestResponseErrorDetail struct {
-	Field       string `json:"field"`
-	Description string `json:"description"`
-}
-
-func customErrorHandler() func(context.Context, *runtime.ServeMux, runtime.Marshaler, http.ResponseWriter, *http.Request, error) {
+func customizeErrorHandler() func(context.Context, *runtime.ServeMux, runtime.Marshaler, http.ResponseWriter, *http.Request, error) {
 	return func(_ context.Context, _ *runtime.ServeMux, marshaler runtime.Marshaler, w http.ResponseWriter, _ *http.Request, err error) {
+		var st interface {
+			Code() codes.Code
+			Message() string
+			Details() []any
+		}
+
 		// Extract gRPC status error
 		st, ok := status.FromError(err)
 		if !ok {
 			// Fallback for non-gRPC errors
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+			st = NewStatus(codes.Internal, err, "ups, something went wrong!")
 		}
 
 		// Default HTTP status code
 		httpStatus := runtime.HTTPStatusFromCode(st.Code())
 
 		if httpStatus != http.StatusBadRequest {
-			// Write the custom error response
-			w.WriteHeader(httpStatus)
-			_ = json.NewEncoder(w).Encode(errorResponse{
+			errRes := errorResponse{
 				Code:    httpStatus,
 				Message: st.Message(),
-			}) //nolint:errcheck
+			}
+
+			if stErr, ok := st.(error); ok {
+				errRes.Error = stErr.Error()
+			}
+
+			if stEr, ok := st.(interface{ Err() error }); ok {
+				errRes.Error = stEr.Err().Error()
+			}
+
+			// Write the custom error response
+			w.WriteHeader(httpStatus)
+
+			_ = json.NewEncoder(w).Encode(errRes) //nolint:errcheck
 
 			return
 		}
 
 		// Transform google.rpc.BadRequest into a simplified structure
-		var details []badRequestResponseErrorDetail
+		var details []errorResponseDetails
 
 		for _, d := range st.Details() {
-			if badRequest, ok := d.(*errdetails.BadRequest); ok {
-				for _, violation := range badRequest.FieldViolations {
-					details = append(details, badRequestResponseErrorDetail{
-						Field:       violation.Field,
-						Description: violation.Description,
-					})
-				}
+			badRequest, ok := d.(*errdetails.BadRequest)
+			if !ok {
+				continue
+			}
+
+			for _, violation := range badRequest.FieldViolations {
+				details = append(details, errorResponseDetails{
+					Field:       violation.Field,
+					Description: violation.Description,
+				})
 			}
 		}
 
 		// Write the custom error response
 		w.WriteHeader(httpStatus)
-		_ = json.NewEncoder(w).Encode(badRequestResponse{
-			errorResponse: errorResponse{
-				Code:    httpStatus,
-				Message: st.Message(),
-			},
+
+		_ = json.NewEncoder(w).Encode(errorResponse{
+			Code:    httpStatus,
+			Message: st.Message(),
 			Details: details,
 		}) //nolint:errcheck
 	}
