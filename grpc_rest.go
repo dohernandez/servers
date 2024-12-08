@@ -1,6 +1,8 @@
 package servers
 
 import (
+	"context"
+	"google.golang.org/protobuf/proto"
 	"net/http"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -44,7 +46,7 @@ func WithDocEndpoint(serviceName, basePath, filepath string, json []byte) Option
 			basePath,
 			filepath,
 			json,
-		))(srv)
+		))(s)
 	}
 }
 
@@ -61,7 +63,7 @@ func WithVersionEndpoint() Option {
 
 		WithHandlers(map[string]http.Handler{
 			"/version": NewRestVersionHandler(),
-		})(srv)
+		})(s)
 	}
 }
 
@@ -87,6 +89,25 @@ func WithHandlers(handlers map[string]http.Handler) Option {
 				return nil
 			})
 		}
+	}
+}
+
+// WithResponseModifier sets the options for custom response modifier to the mux server.
+func WithResponseModifier(modifier ...func(ctx context.Context, w http.ResponseWriter, _ proto.Message) error) Option {
+	return func(srv any) {
+		s, ok := srv.(*GRPCRest)
+		if !ok {
+			// skip does not apply to this instance.
+			return
+		}
+
+		opts := make([]runtime.ServeMuxOption, 0, len(modifier))
+
+		for _, m := range modifier {
+			opts = append(opts, runtime.WithForwardResponseOption(m))
+		}
+
+		WithServerMuxOption(opts...)(s)
 	}
 }
 
@@ -137,6 +158,11 @@ func NewGRPCRest(config Config, opts ...Option) (*GRPCRest, error) {
 	WithHandlers(map[string]http.Handler{
 		"/": NewRestRootHandler(config.Name, links...),
 	})(srv)
+
+	WithResponseModifier(
+		NewXhttpCodeResponseModifier(),
+		CleanGrpcMetadataResponseModifier(),
+	)(srv)
 
 	// Init REST Server.
 	mux := runtime.NewServeMux(srv.options.muxOpts...)
