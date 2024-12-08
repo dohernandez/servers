@@ -1,8 +1,12 @@
 package servers
 
 import (
+	"context"
 	"encoding/json"
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"google.golang.org/protobuf/proto"
 	"net/http"
+	"strconv"
 
 	"github.com/bool64/ctxd"
 	v3 "github.com/swaggest/swgui/v3"
@@ -71,5 +75,41 @@ func NewRestAPIDocsHandlers(serviceName, basePath, swaggerPath string, swaggerJS
 		"/docs/swagger-ui.css": http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			swh.ServeHTTP(w, r)
 		}),
+	}
+}
+
+// NewXhttpCodeResponseModifier is used to modify the Response status code using x-http-code header
+// by setting a different code than 200 on success or 500 on failure.
+func NewXhttpCodeResponseModifier() func(ctx context.Context, w http.ResponseWriter, _ proto.Message) error {
+	return func(ctx context.Context, w http.ResponseWriter, _ proto.Message) error {
+		md, ok := runtime.ServerMetadataFromContext(ctx)
+		if !ok {
+			return nil
+		}
+
+		// set http status code
+		if vals := md.HeaderMD.Get("x-http-code"); len(vals) > 0 {
+			code, err := strconv.Atoi(vals[0])
+			if err != nil {
+				return err
+			}
+
+			// delete the headers to not expose any grpc-metadata in http response
+			delete(md.HeaderMD, "x-http-code")
+			delete(w.Header(), "Grpc-Metadata-X-Http-Code")
+
+			w.WriteHeader(code)
+		}
+
+		return nil
+	}
+}
+
+// CleanGrpcMetadataResponseModifier is used to clean the grpc metadata from the response.
+func CleanGrpcMetadataResponseModifier() func(ctx context.Context, w http.ResponseWriter, _ proto.Message) error {
+	return func(ctx context.Context, w http.ResponseWriter, _ proto.Message) error {
+		w.Header().Del("Grpc-Metadata-Content-Type")
+
+		return nil
 	}
 }
