@@ -2,10 +2,10 @@ package servers
 
 import (
 	"context"
-	"google.golang.org/protobuf/proto"
 	"net/http"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"google.golang.org/protobuf/proto"
 )
 
 type grpcRestOptions struct {
@@ -142,7 +142,7 @@ func NewGRPCRest(config Config, opts ...Option) (*GRPCRest, error) {
 	srv := &GRPCRest{}
 
 	// Use custom error handler but can be modified by opts from consumers.
-	WithServerMuxOption(runtime.WithErrorHandler(customErrorHandler()))(srv)
+	WithServerMuxOption(runtime.WithErrorHandler(customizeErrorHandler()))(srv)
 
 	for _, o := range opts {
 		o(srv)
