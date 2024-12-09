@@ -2,10 +2,10 @@ package servers
 
 import (
 	"context"
-	"google.golang.org/protobuf/proto"
 	"net/http"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"google.golang.org/protobuf/proto"
 )
 
 type grpcRestOptions struct {

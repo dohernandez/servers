@@ -9,15 +9,12 @@ import (
 
 const errorMessageInvalidArgument = "invalid argument"
 
+// Status represents an RPC status code, message, and details.
 type Status struct {
 	*status.Status
 
 	id  string
 	err error
-
-	// details represents the details of the validator failure.
-	// map[field]message
-	details map[string]string
 }
 
 // NewStatus returns a Status representing code, error and details.
@@ -28,24 +25,26 @@ type Status struct {
 // When details is a map[string]string, it is used as the details of validator failure and
 // message is set as errorMessageInvalidArgument.
 func NewStatus(c codes.Code, err error, details any) *Status {
+	var fieldViolations map[string]string
+
 	// Check if details is a string or a map[string]string
-	switch details.(type) {
+	switch det := details.(type) {
 	case string:
 		return &Status{
 			id:     uuid.New().String(),
-			Status: status.New(c, details.(string)),
+			Status: status.New(c, det),
 			err:    err,
 		}
 
 	case map[string]string:
-		break
+		fieldViolations = det
 	default:
 		panic("details must be a string or a map[string]string")
 	}
 
 	br := &errdetails.BadRequest{}
 
-	for f, m := range details.(map[string]string) {
+	for f, m := range fieldViolations {
 		br.FieldViolations = append(br.FieldViolations, &errdetails.BadRequest_FieldViolation{
 			Field:       f,
 			Description: m,
