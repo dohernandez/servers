@@ -154,12 +154,13 @@ func customizeErrorHandler() func(context.Context, *runtime.ServeMux, runtime.Ma
 				Message: st.Message(),
 			}
 
-			if stErr, ok := st.(error); ok {
-				errRes.Error = stErr.Error()
-			}
-
-			if stEr, ok := st.(interface{ Err() error }); ok {
-				errRes.Error = stEr.Err().Error()
+			switch t := st.(type) {
+			case interface{ ID() string }:
+				errRes.Error = t.ID()
+			case interface{ Err() error }:
+				errRes.Error = t.Err().Error()
+			case error:
+				errRes.Error = t.Error()
 			}
 
 			// Write the custom error response

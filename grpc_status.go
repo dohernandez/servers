@@ -2,9 +2,11 @@ package servers
 
 import (
 	"github.com/google/uuid"
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"net/http"
 )
 
 const errorMessageInvalidArgument = "invalid argument"
@@ -39,7 +41,11 @@ func NewStatus(c codes.Code, err error, details any) *Status {
 	case map[string]string:
 		fieldViolations = det
 	default:
-		panic("details must be a string or a map[string]string")
+		return &Status{
+			id:     uuid.New().String(),
+			Status: status.New(c, http.StatusText(runtime.HTTPStatusFromCode(c))),
+			err:    err,
+		}
 	}
 
 	br := &errdetails.BadRequest{}
@@ -63,6 +69,22 @@ func NewStatus(c codes.Code, err error, details any) *Status {
 }
 
 func (s *Status) Error() string {
+	return s.Message()
+}
+
+// Is implements future error.Is functionality.
+// An Error is equivalent if err message identical.
+func (s *Status) Is(err error) bool {
+	return s.err.Error() == err.Error()
+}
+
+// Unwrap implements errors.Unwrap for Error.
+func (s *Status) Unwrap() error {
+	return s.err
+}
+
+// ID returns the unique identifier of the error.
+func (s *Status) ID() string {
 	return s.id
 }
 
