@@ -3,6 +3,7 @@ package servers
 import (
 	"context"
 	"encoding/json"
+	"google.golang.org/grpc/codes"
 	"net/http"
 	"strconv"
 
@@ -10,7 +11,6 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	v3 "github.com/swaggest/swgui/v3"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
@@ -132,58 +132,38 @@ type errorResponseDetails struct {
 //nolint:funlen
 func customizeErrorHandler() func(context.Context, *runtime.ServeMux, runtime.Marshaler, http.ResponseWriter, *http.Request, error) {
 	return func(_ context.Context, _ *runtime.ServeMux, marshaler runtime.Marshaler, w http.ResponseWriter, _ *http.Request, err error) {
-		var st interface {
-			Code() codes.Code
-			Message() string
-			Details() []any
-		}
-
 		// Extract gRPC status error
 		st, ok := status.FromError(err)
 		if !ok {
 			// Fallback for non-gRPC errors
-			st = NewStatus(codes.Internal, err, "ups, something went wrong!")
+			st = newStatus(codes.Internal, err, "ups, something went wrong!")
 		}
 
 		// Default HTTP status code
 		httpStatus := runtime.HTTPStatusFromCode(st.Code())
 
-		if httpStatus != http.StatusBadRequest {
-			errRes := errorResponse{
-				Code:    httpStatus,
-				Message: st.Message(),
-			}
-
-			switch t := st.(type) {
-			case interface{ ID() string }:
-				errRes.Error = t.ID()
-			case interface{ Err() error }:
-				errRes.Error = t.Err().Error()
-			case error:
-				errRes.Error = t.Error()
-			}
-
-			// Write the custom error response
-			w.WriteHeader(httpStatus)
-
-			_ = json.NewEncoder(w).Encode(errRes) //nolint:errcheck
-
-			return
-		}
-
 		// Transform google.rpc.BadRequest into a simplified structure
-		var details []errorResponseDetails
+		var (
+			details []errorResponseDetails
+			errID   string
+		)
 
 		for _, d := range st.Details() {
-			badRequest, ok := d.(*errdetails.BadRequest)
+			errInfo, ok := d.(*errdetails.ErrorInfo)
 			if !ok {
 				continue
 			}
 
-			for _, violation := range badRequest.GetFieldViolations() {
+			for f, m := range errInfo.GetMetadata() {
+				if f == "error_id" {
+					errID = m
+
+					continue
+				}
+
 				details = append(details, errorResponseDetails{
-					Field:       violation.GetField(),
-					Description: violation.GetDescription(),
+					Field:       f,
+					Description: m,
 				})
 			}
 		}
@@ -194,6 +174,7 @@ func customizeErrorHandler() func(context.Context, *runtime.ServeMux, runtime.Ma
 		_ = json.NewEncoder(w).Encode(errorResponse{ //nolint:errcheck
 			Code:    httpStatus,
 			Message: st.Message(),
+			Error:   errID,
 			Details: details,
 		})
 	}
