@@ -136,7 +136,7 @@ func customizeErrorHandler() func(context.Context, *runtime.ServeMux, runtime.Ma
 		if !ok {
 			// Fallback for non-gRPC errors
 			// There is no need to check if extract sinc we are sure that the error is a gRPC error
-			st, _ = status.FromError(WrapError(codes.Internal, err, "ups, something went wrong!"))
+			st, _ = status.FromError(WrapError(codes.Internal, err, "ups, something went wrong!")) //nolint:contextcheck
 		}
 
 		// Default HTTP status code

@@ -55,13 +55,9 @@ func newStatus(c codes.Code, err error, details map[string]string) *Status {
 
 	// Adding the error id to the metadata of the error.
 	werr := errors.Unwrap(err)
-	if werr != nil {
-		err = werr
+	if werr == nil {
+		werr = err
 	}
-
-	err = ctxd.WrapError(context.Background(), err, msg, "error_id", id)
-
-	st := &Status{err: err}
 
 	if details == nil {
 		grpcst, err := status.New(c, msg).WithDetails(errInfo)
@@ -69,9 +65,10 @@ func newStatus(c codes.Code, err error, details map[string]string) *Status {
 			panic(err)
 		}
 
-		st.Status = grpcst
-
-		return st
+		return &Status{
+			Status: grpcst,
+			err:    ctxd.WrapError(context.Background(), werr, msg, "error_id", id),
+		}
 	}
 
 	for f, m := range details {
@@ -83,9 +80,10 @@ func newStatus(c codes.Code, err error, details map[string]string) *Status {
 		panic(err)
 	}
 
-	st.Status = grpcst
-
-	return st
+	return &Status{
+		Status: grpcst,
+		err:    ctxd.WrapError(context.Background(), werr, msg, "error_id", id, "details", details),
+	}
 }
 
 // Error creates a new error with the given code, message and details if this is provided.
