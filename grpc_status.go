@@ -53,13 +53,19 @@ func newStatus(c codes.Code, err error, details map[string]string) *Status {
 		},
 	}
 
+	// Creating kvs for structured logging with all possible details.
+	kvs := make([]any, 0, len(details)*2+2)
+
+	// Adding the error id to the metadata of the error.
+	kvs = append(kvs, "error_id", id)
+
 	// Adding the error id to the metadata of the error.
 	werr := errors.Unwrap(err)
 	if werr == nil {
 		werr = err
 	}
 
-	if details == nil {
+	if details == nil || len(details) == 0 {
 		grpcst, err := status.New(c, msg).WithDetails(errInfo)
 		if err != nil {
 			panic(err)
@@ -67,9 +73,11 @@ func newStatus(c codes.Code, err error, details map[string]string) *Status {
 
 		return &Status{
 			Status: grpcst,
-			err:    ctxd.WrapError(context.Background(), werr, msg, "error_id", id),
+			err:    ctxd.WrapError(context.Background(), werr, msg, kvs...),
 		}
 	}
+
+	kvs = append(kvs, "details", details)
 
 	for f, m := range details {
 		errInfo.Metadata[f] = m
@@ -82,7 +90,7 @@ func newStatus(c codes.Code, err error, details map[string]string) *Status {
 
 	return &Status{
 		Status: grpcst,
-		err:    ctxd.WrapError(context.Background(), werr, msg, "error_id", id, "details", details),
+		err:    ctxd.WrapError(context.Background(), werr, msg, kvs...),
 	}
 }
 
