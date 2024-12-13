@@ -85,6 +85,8 @@ func NewRestAPIDocsHandlers(serviceName, basePath, swaggerPath string, swaggerJS
 // by setting a different code than 200 on success or 500 on failure.
 func xhttpCodeResponseModifier() func(ctx context.Context, w http.ResponseWriter, _ proto.Message) error {
 	return func(ctx context.Context, w http.ResponseWriter, _ proto.Message) error {
+		w.Header().Del("Grpc-Metadata-Content-Type")
+
 		md, ok := runtime.ServerMetadataFromContext(ctx)
 		if !ok {
 			return nil
@@ -103,15 +105,6 @@ func xhttpCodeResponseModifier() func(ctx context.Context, w http.ResponseWriter
 
 			w.WriteHeader(code)
 		}
-
-		return nil
-	}
-}
-
-// cleanGrpcMetadataResponseModifier is used to clean the grpc metadata from the response.
-func cleanGrpcMetadataResponseModifier() func(ctx context.Context, w http.ResponseWriter, _ proto.Message) error {
-	return func(ctx context.Context, w http.ResponseWriter, _ proto.Message) error {
-		w.Header().Del("Grpc-Metadata-Content-Type")
 
 		return nil
 	}
