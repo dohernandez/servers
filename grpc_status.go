@@ -1,6 +1,7 @@
 package servers
 
 import (
+	"context"
 	"errors"
 
 	"github.com/bool64/ctxd"
@@ -51,6 +52,14 @@ func newStatus(c codes.Code, err error, details map[string]string) *Status {
 			"error_id": id,
 		},
 	}
+
+	// Adding the error id to the metadata of the error.
+	werr := errors.Unwrap(err)
+	if werr != nil {
+		err = werr
+	}
+
+	err = ctxd.WrapError(context.Background(), err, msg, "error_id", id)
 
 	st := &Status{err: err}
 
