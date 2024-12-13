@@ -1,37 +1,46 @@
 package servers
 
 import (
+	"errors"
+
+	"github.com/bool64/ctxd"
 	"github.com/google/uuid"
-	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"net/http"
+	"google.golang.org/protobuf/proto"
 )
 
-// newStatus returns a status.Status representing c and msg.
+// Status references the status.Status from google.golang.org/grpc/status.
+type Status struct {
+	*status.Status
+
+	err error
+}
+
+// Err returns an immutable error representing s; returns nil if s.Code() is OK.
+func (s *Status) Err() error {
+	if s.Code() == codes.OK {
+		return nil
+	}
+
+	return &errSt{s: s}
+}
+
+// newStatus returns a Status representing c and msg.
 //
 // details is a string or a map[string]string otherwise panic.
 //
 // When details is a string, it is used as the error message.
 // When details is a map[string]string, it is used as the details of validator failure and
 // message is set as http.StatusText(runtime.HTTPStatusFromCode(c)).
-func newStatus(c codes.Code, err error, details any) *status.Status {
-	var (
-		fieldViolations map[string]string
-		msg             string
-	)
+func newStatus(c codes.Code, err error, details map[string]string) *Status {
+	msg := err.Error()
 
-	// Check if details is a string or a map[string]string
-	switch det := details.(type) {
-	case string:
-		msg = det
+	var lerr ctxd.SentinelError
 
-	case map[string]string:
-		msg = http.StatusText(runtime.HTTPStatusFromCode(c))
-		fieldViolations = det
-	default:
-		msg = http.StatusText(runtime.HTTPStatusFromCode(c))
+	if errors.As(err, &lerr) {
+		msg = lerr.Error()
 	}
 
 	id := uuid.New().String()
@@ -43,31 +52,115 @@ func newStatus(c codes.Code, err error, details any) *status.Status {
 		},
 	}
 
-	if fieldViolations == nil {
-		st, err := status.New(c, msg).WithDetails(errInfo)
+	st := &Status{err: err}
+
+	if details == nil {
+		grpcst, err := status.New(c, msg).WithDetails(errInfo)
 		if err != nil {
 			panic(err)
 		}
 
+		st.Status = grpcst
+
 		return st
 	}
 
-	for f, m := range fieldViolations {
+	for f, m := range details {
 		errInfo.Metadata[f] = m
 	}
 
-	st, err := status.New(c, msg).WithDetails(errInfo)
+	grpcst, err := status.New(c, msg).WithDetails(errInfo)
 	if err != nil {
 		panic(err)
 	}
 
+	st.Status = grpcst
+
 	return st
 }
 
-func Error(c codes.Code, err error, details ...any) error {
+// Error creates a new error with the given code, message and details if this is provided.
+// If more than one details are provided, they are merged into a single map.
+func Error(c codes.Code, msg string, details ...map[string]string) error {
 	if len(details) == 0 {
-		return newStatus(c, err, nil).Err()
+		return newError(c, ctxd.SentinelError(msg), details...)
 	}
 
-	return newStatus(c, err, details[0]).Err()
+	return newError(c, ctxd.SentinelError(msg), details...)
+}
+
+func newError(c codes.Code, err error, details ...map[string]string) error {
+	merge := make(map[string]string)
+
+	for _, d := range details {
+		for k, v := range d {
+			merge[k] = v
+		}
+	}
+
+	return newStatus(c, err, merge).Err()
+}
+
+// WrapError wraps an error with the given code, message and details if this is provided.
+// If more than one details are provided, they are merged into a single map.
+func WrapError(c codes.Code, err error, msg string, details ...map[string]string) error {
+	err = ctxd.LabeledError(err, ctxd.SentinelError(msg))
+
+	if len(details) == 0 {
+		return newError(c, err, details...)
+	}
+
+	return newError(c, err, details...)
+}
+
+type errSt struct {
+	s *Status
+}
+
+// Error returns the error message.
+func (e *errSt) Error() string {
+	return e.s.Message()
+}
+
+// GRPCStatus returns the Status represented by se.
+func (e *errSt) GRPCStatus() *status.Status {
+	return e.s.Status
+}
+
+// Is implements future error.Is functionality.
+// A Error is equivalent if the code and message are identical.
+func (e *errSt) Is(target error) bool {
+	tse, ok := target.(*errSt)
+	if !ok {
+		return false
+	}
+
+	return proto.Equal(e.s.Status.Proto(), tse.s.Status.Proto())
+}
+
+// Unwrap implements errors wrapper.
+func (e *errSt) Unwrap() error {
+	return e.s.err
+}
+
+// Tuples returns structured data of error in form of loosely-typed key-value pairs.
+func (e *errSt) Tuples() []any {
+	var errStuctured ctxd.StructuredError
+
+	if !errors.As(e.s.err, &errStuctured) {
+		return nil
+	}
+
+	return errStuctured.Tuples()
+}
+
+// Fields returns structured data of error as a map.
+func (e *errSt) Fields() map[string]any {
+	var errStuctured ctxd.StructuredError
+
+	if !errors.As(e.s.err, &errStuctured) {
+		return nil
+	}
+
+	return errStuctured.Fields()
 }
