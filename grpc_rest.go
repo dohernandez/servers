@@ -164,7 +164,6 @@ func NewGRPCRest(config Config, opts ...Option) (*GRPCRest, error) {
 
 	WithResponseModifier(
 		xhttpCodeResponseModifier(),
-		cleanGrpcMetadataResponseModifier(),
 	)(srv)
 
 	// Init REST Server.
