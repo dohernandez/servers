@@ -3,7 +3,6 @@ package servers
 import (
 	"context"
 	"encoding/json"
-	"google.golang.org/grpc/codes"
 	"net/http"
 	"strconv"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	v3 "github.com/swaggest/swgui/v3"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
@@ -129,14 +129,14 @@ type errorResponseDetails struct {
 	Description string `json:"description,omitempty"`
 }
 
-//nolint:funlen
 func customizeErrorHandler() func(context.Context, *runtime.ServeMux, runtime.Marshaler, http.ResponseWriter, *http.Request, error) {
 	return func(_ context.Context, _ *runtime.ServeMux, marshaler runtime.Marshaler, w http.ResponseWriter, _ *http.Request, err error) {
 		// Extract gRPC status error
 		st, ok := status.FromError(err)
 		if !ok {
 			// Fallback for non-gRPC errors
-			st = newStatus(codes.Internal, err, "ups, something went wrong!")
+			// There is no need to check if extract sinc we are sure that the error is a gRPC error
+			st, _ = status.FromError(WrapError(codes.Internal, err, "ups, something went wrong!"))
 		}
 
 		// Default HTTP status code
@@ -167,6 +167,9 @@ func customizeErrorHandler() func(context.Context, *runtime.ServeMux, runtime.Ma
 				})
 			}
 		}
+
+		// Delete the gRPC metadata from the response
+		w.Header().Del("Grpc-Metadata-Content-Type")
 
 		// Write the custom error response
 		w.WriteHeader(httpStatus)
