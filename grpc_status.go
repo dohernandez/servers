@@ -65,7 +65,7 @@ func newStatus(c codes.Code, err error, details map[string]string) *Status {
 		werr = err
 	}
 
-	if details == nil || len(details) == 0 {
+	if len(details) == 0 {
 		grpcst, err := status.New(c, msg).WithDetails(errInfo)
 		if err != nil {
 			panic(err)
