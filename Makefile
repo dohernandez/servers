@@ -56,7 +56,7 @@ SWAGGER_PATH = ./testdata
 test: test-unit
 
 ## Check the commit compile and test the change.
-check: lint test
+check: fix-lint lint test
 
 ## Generate code from proto file(s)
 proto-gen: proto-gen-code-swagger

@@ -141,12 +141,12 @@ func TestGRPC_Stop(t *testing.T) {
 	}
 }
 
-func TestGRPC_StartServing_WithHealthCheck(t *testing.T) {
+func TestGRPC_StartServing_WithGrpcHealthCheck(t *testing.T) {
 	srv, addr, err := startGRPCService(
 		nil,
 		nil,
 		nil,
-		servers.WithHealthCheck(testdata.Greeter_ServiceDesc.ServiceName),
+		servers.WithGrpcHealthCheck(),
 	)
 	require.NoErrorf(t, err, "start GRPC: %v", err)
 
@@ -165,7 +165,7 @@ func TestGRPC_StartServing_WithHealthCheck(t *testing.T) {
 	defer cancel()
 
 	res, err := healthClient.Check(ctx, &grpc_health_v1.HealthCheckRequest{
-		Service: testdata.Greeter_ServiceDesc.ServiceName,
+		Service: "Test service",
 	})
 	require.NoError(t, err, "health call: %v", err)
 

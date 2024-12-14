@@ -15,23 +15,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestHealthcheckService_StartServing(t *testing.T) {
-	h, err := health.New(health.WithComponent(health.Component{
-		Name:    "myservice",
-		Version: "v1.0",
-	}), health.WithChecks(health.Config{
-		Name: "health-check",
-		Check: func(context.Context) error {
-			return nil
+func TestHealthcheckService_root(t *testing.T) {
+	srv := servers.NewHealthCheck(
+		servers.Config{
+			Name: "Health test service",
+			Host: "localhost",
+			Port: 0,
 		},
-	}))
-	require.NoError(t, err)
-
-	srv := servers.NewHealthCheck(servers.Config{
-		Name: "K8 probes",
-		Host: "localhost",
-		Port: 0,
-	}, h.Handler(), servers.WithAddrAssigned())
+		servers.WithHealthCheck(
+			health.Config{
+				Name: "health-check",
+				Check: func(ctx context.Context) error {
+					return nil
+				},
+			}),
+		servers.WithAddrAssigned(),
+	)
 
 	// creating channel to return the error returned by servicing.Start.
 	result := make(chan error, 1)
@@ -55,18 +54,14 @@ func TestHealthcheckService_StartServing(t *testing.T) {
 	res, err := http.Get(fmt.Sprintf("http://%s/", addr))
 	require.NoError(t, err)
 
-	content, err := resBodyContent(res)
-	require.NoError(t, err)
+	_ = res.Body.Close() //nolint:errcheck
 
 	assert.Equal(t, http.StatusOK, res.StatusCode, "/ returned wrong status code: got %s, want %s", res.StatusCode, http.StatusOK)
-
-	expectedContent := "Welcome to K8 probes"
-	assert.Equalf(t, expectedContent, string(content), "unexpected response body: got %s, want %s", string(content), expectedContent)
 
 	res, err = http.Get(fmt.Sprintf("http://%s/health", addr))
 	require.NoError(t, err)
 
-	content, err = resBodyContent(res)
+	content, err := resBodyContent(res)
 	require.NoError(t, err)
 
 	body := make(map[string]interface{})
@@ -82,4 +77,120 @@ func resBodyContent(res *http.Response) ([]byte, error) {
 	defer res.Body.Close() //nolint:errcheck
 
 	return io.ReadAll(res.Body)
+}
+
+func TestHealthcheckService_root_grpc_rest(t *testing.T) {
+	grpcSrv, grpcAddr, err := startGRPCService(nil, nil, nil)
+	require.NoErrorf(t, err, "start GRPC: %v", err)
+
+	defer grpcSrv.Stop()
+
+	grpcRestSrv, _, err := startGRPCRestService(grpcAddr, nil, nil)
+	require.NoErrorf(t, err, "start GRPC Rest: %v", err)
+
+	defer grpcRestSrv.Stop()
+
+	srv := servers.NewHealthCheck(
+		servers.Config{
+			Name: "Health test service",
+			Host: "localhost",
+			Port: 0,
+		},
+		servers.WithHealthCheck(
+			health.Config{
+				Name: "health-check",
+				Check: func(ctx context.Context) error {
+					return nil
+				},
+			}),
+		servers.WithGRPCRest(grpcRestSrv),
+		servers.WithAddrAssigned(),
+	)
+
+	// creating channel to return the error returned by servicing.Start.
+	result := make(chan error, 1)
+
+	// starting the server
+	go func() {
+		err := srv.Start()
+
+		result <- err
+	}()
+
+	var addr string
+
+	select {
+	case err := <-result:
+		t.Fatalf("failed to start REST: %s", err)
+	// using srv.AddrAssigned to confirm that grpc server is up and running
+	case addr = <-srv.AddrAssigned:
+	}
+
+	res, err := http.Get(fmt.Sprintf("http://%s/", addr))
+	require.NoError(t, err)
+
+	_ = res.Body.Close() //nolint:errcheck
+
+	assert.Equal(t, http.StatusOK, res.StatusCode, "/ returned wrong status code: got %s, want %s", res.StatusCode, http.StatusOK)
+}
+
+func TestHealthcheckService_health(t *testing.T) {
+	grpcSrv, grpcAddr, err := startGRPCService(
+		nil,
+		nil,
+		nil,
+		servers.WithGrpcHealthCheck(),
+	)
+	require.NoErrorf(t, err, "start GRPC: %v", err)
+
+	defer grpcSrv.Stop()
+
+	grpcRestSrv, _, err := startGRPCRestService(grpcAddr, nil, nil)
+	require.NoErrorf(t, err, "start GRPC Rest: %v", err)
+
+	defer grpcRestSrv.Stop()
+
+	srv := servers.NewHealthCheck(
+		servers.Config{
+			Name: "Health test service",
+			Host: "localhost",
+			Port: 0,
+		},
+		servers.WithHealthCheck(
+			health.Config{
+				Name: "health-check",
+				Check: func(ctx context.Context) error {
+					return nil
+				},
+			}),
+		servers.WithGRPC(grpcSrv),
+		servers.WithGRPCRest(grpcRestSrv),
+		servers.WithAddrAssigned(),
+	)
+
+	// creating channel to return the error returned by servicing.Start.
+	result := make(chan error, 1)
+
+	// starting the server
+	go func() {
+		err := srv.Start()
+
+		result <- err
+	}()
+
+	var addr string
+
+	select {
+	case err := <-result:
+		t.Fatalf("failed to start REST: %s", err)
+	// using srv.AddrAssigned to confirm that grpc server is up and running
+	case addr = <-srv.AddrAssigned:
+	}
+
+	res, err := http.Get(fmt.Sprintf("http://%s/health", addr))
+	require.NoError(t, err)
+
+	_ = res.Body.Close() //nolint:errcheck
+
+	assert.Equal(t, http.StatusOK, res.StatusCode, "/ returned wrong status code: got %s, want %s", res.StatusCode, http.StatusOK)
 }
