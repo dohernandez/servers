@@ -21,12 +21,13 @@
 package testdata
 
 import (
+	reflect "reflect"
+	sync "sync"
+
 	_ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	reflect "reflect"
-	sync "sync"
 )
 
 const (
@@ -196,11 +197,14 @@ func file_helloworld_proto_rawDescGZIP() []byte {
 	return file_helloworld_proto_rawDescData
 }
 
-var file_helloworld_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
-var file_helloworld_proto_goTypes = []any{
-	(*HelloRequest)(nil), // 0: helloworld.HelloRequest
-	(*HelloReply)(nil),   // 1: helloworld.HelloReply
-}
+var (
+	file_helloworld_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+	file_helloworld_proto_goTypes  = []any{
+		(*HelloRequest)(nil), // 0: helloworld.HelloRequest
+		(*HelloReply)(nil),   // 1: helloworld.HelloReply
+	}
+)
+
 var file_helloworld_proto_depIdxs = []int32{
 	0, // 0: helloworld.Greeter.SayHello:input_type -> helloworld.HelloRequest
 	1, // 1: helloworld.Greeter.SayHello:output_type -> helloworld.HelloReply

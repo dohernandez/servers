@@ -109,9 +109,9 @@ func WithGRPCObserver(observer GRPCObserver) Option {
 	}
 }
 
-// WithHealthCheck sets service to enable health check.
+// WithGrpcHealthCheck sets service to enable health check.
 // Apply to GRPC server instances.
-func WithHealthCheck(serviceName string) Option {
+func WithGrpcHealthCheck() Option {
 	return func(srv any) {
 		s, ok := srv.(*GRPC)
 		if !ok {
@@ -120,7 +120,6 @@ func WithHealthCheck(serviceName string) Option {
 		}
 
 		s.options.healthCheck = true
-		s.options.checkServiceName = serviceName
 	}
 }
 
@@ -194,7 +193,7 @@ func NewGRPC(config Config, opts ...Option) *GRPC {
 	if srv.options.healthCheck {
 		grpcHealthServer := health.NewServer()
 		grpcHealthServer.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
-		grpcHealthServer.SetServingStatus(srv.options.checkServiceName, healthpb.HealthCheckResponse_SERVING)
+		grpcHealthServer.SetServingStatus(config.Name, healthpb.HealthCheckResponse_SERVING)
 		healthpb.RegisterHealthServer(grpcSrv, grpcHealthServer)
 
 		srv.grpcHealthServer = grpcHealthServer
@@ -214,8 +213,7 @@ type grpcOptions struct {
 	observer GRPCObserver
 	logger   ctxd.Logger
 
-	healthCheck      bool
-	checkServiceName string
+	healthCheck bool
 }
 
 // GRPC is a listening grpc server instance.

@@ -157,10 +157,6 @@ func RegisterGreeterHandlerClient(ctx context.Context, mux *runtime.ServeMux, cl
 	return nil
 }
 
-var (
-	pattern_Greeter_SayHello_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1}, []string{"say", "name"}, ""))
-)
+var pattern_Greeter_SayHello_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1}, []string{"say", "name"}, ""))
 
-var (
-	forward_Greeter_SayHello_0 = runtime.ForwardResponseMessage
-)
+var forward_Greeter_SayHello_0 = runtime.ForwardResponseMessage
