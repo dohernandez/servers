@@ -31,7 +31,7 @@ func TestHealthcheckService_StartServing(t *testing.T) {
 		Name: "K8 probes",
 		Host: "localhost",
 		Port: 0,
-	}, h.Handler())
+	}, h.Handler(), servers.WithAddrAssigned())
 
 	// creating channel to return the error returned by servicing.Start.
 	result := make(chan error, 1)
