@@ -8,7 +8,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/status"
 )
 
 // getClientID extracts the client ID from the context metadata.
@@ -91,7 +90,7 @@ func (r *PerClientRateLimiter) UnaryServerInterceptor() func(ctx context.Context
 		limiter := r.getLimiter(clientID)
 
 		if !limiter.Allow() {
-			return nil, status.Errorf(codes.ResourceExhausted, "rate limit exceeded for client: %s", clientID)
+			return nil, Error(codes.ResourceExhausted, "rate limit exceeded for client: %s", map[string]string{"client": clientID})
 		}
 
 		return handler(ctx, req)
