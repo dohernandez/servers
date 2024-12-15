@@ -85,7 +85,7 @@ func (r *PerClientRateLimiter) getLimiter(clientID string) *rate.Limiter {
 }
 
 // UnaryServerInterceptor returns a new unary server interceptor that limits the number of requests per client.
-func (r *PerClientRateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
+func (r *PerClientRateLimiter) UnaryServerInterceptor() func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		clientID := getClientID(ctx) // Extract client ID from metadata or IP
 		limiter := r.getLimiter(clientID)
