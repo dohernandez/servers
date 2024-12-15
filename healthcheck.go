@@ -116,6 +116,7 @@ func NewHealthCheck(cfg Config, opts ...Option) *HealthCheck {
 
 	r := chi.NewRouter()
 
+	// Check if the rest service is up and running by hitting the root endpoint.
 	r.Method(http.MethodGet, "/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Del("Content-Length")
 		w.Header().Set("Content-Type", "application/json")
@@ -144,6 +145,7 @@ func NewHealthCheck(cfg Config, opts ...Option) *HealthCheck {
 		w.WriteHeader(http.StatusOK)
 	}))
 
+	// Check if the service dependencies are up and running.
 	r.Method(http.MethodGet, "/health", h.Handler())
 
 	srv.REST = NewREST(cfg, r, opts...)

@@ -213,6 +213,8 @@ type grpcOptions struct {
 	observer GRPCObserver
 	logger   ctxd.Logger
 
+	limiter GRPCRateLimiter
+
 	healthCheck bool
 }
 
